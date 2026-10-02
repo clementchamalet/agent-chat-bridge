@@ -1,0 +1,45 @@
+{
+  "name": "agent-chat-bridge",
+  "version": "2.0.0",
+  "private": true,
+  "license": "MIT",
+  "keywords": [
+    "coding-agent",
+    "whatsapp",
+    "telegram",
+    "codex",
+    "claude-code",
+    "opencode"
+  ],
+  "description": "Self-hosted messaging bridge for interactive coding agents on macOS.",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/fix-node-pty-permissions.mjs",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "doctor": "tsx src/doctor.ts",
+    "prune": "tsx src/prune.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "build": "tsc -p tsconfig.build.json && mkdir -p dist/db && cp src/db/schema.sql dist/db/schema.sql",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "node-pty": "^1.0.0",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "4.1.11"
+  }
+}
