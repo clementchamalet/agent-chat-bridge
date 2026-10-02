@@ -5,9 +5,26 @@ import os from "node:os";
 import path from "node:path";
 import { spawn as ptySpawn, type IPty } from "node-pty";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findExternalResumeProcesses, getCpuTimeSeconds, killProcess } from "./externalProcess.js";
+import { findExternalResumeProcesses, getCpuTimeSeconds, isOwnTmuxCommand, killProcess } from "./externalProcess.js";
 
 const RESUME_ID = "test-resume-id-b4f21a";
+
+describe("tmux client recognition", () => {
+  it.each(["tmux", "/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", '"/Applications/Tools Suite/tmux"'])(
+    "recognizes an attached client launched as %s",
+    (executable) => {
+      expect(isOwnTmuxCommand(`${executable} -u attach-session -t wa-codex-example`, "wa-codex-example")).toBe(true);
+    },
+  );
+
+  it.each([
+    "tmux -u attach-session -t wa-codex-example-other",
+    "node --resume wa-codex-example",
+    '/opt/homebrew/bin/tmux -t "wa-codex-example',
+  ])("does not exclude an unrelated or malformed command: %s", (command) => {
+    expect(isOwnTmuxCommand(command, "wa-codex-example")).toBe(false);
+  });
+});
 
 function spawnMarked(extraArg: string): ChildProcess {
   return spawn("node", ["-e", "setInterval(() => {}, 1000)", "--", extraArg], { stdio: "ignore" });
@@ -156,7 +173,8 @@ describe("findExternalResumeProcesses / killProcess — against real processes",
         "-e",
         `setInterval(() => {}, 1000)`,
       ]);
-      let attachClient: IPty | null = ptySpawn("tmux", ["-u", "attach-session", "-t", sessionWithId], {
+      const tmuxExecutable = execFileSync("which", ["tmux"], { encoding: "utf8" }).trim();
+      const attachClient: IPty = ptySpawn(tmuxExecutable, ["-u", "attach-session", "-t", sessionWithId], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
@@ -167,9 +185,16 @@ describe("findExternalResumeProcesses / killProcess — against real processes",
         const pids = findExternalResumeProcesses("claude", RESUME_ID, sessionWithId);
         expect(pids).toEqual([]);
       } finally {
-        attachClient?.kill();
-        attachClient = null;
+        const exited = new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("tmux client did not exit in time")), 3000);
+          attachClient.onExit(() => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+        attachClient.kill("SIGKILL");
         killTmux(sessionWithId);
+        await exited;
       }
     });
 

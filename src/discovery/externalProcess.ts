@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 import type { Engine } from "../types.js";
 import { isPidAlive, readClaudeSessionRegistry } from "./sessionRegistry.js";
+import { commandArgs } from "../utils/commandArgs.js";
 
 /** All descendants of `pid` (not just direct children) — used by ownProcessPids to walk a whole process tree. */
 function descendantPids(pid: number): number[] {
@@ -68,8 +70,13 @@ function pgrepMatches(resumeId: string): PgrepMatch[] {
   return matches;
 }
 
-function isOwnTmuxCommand(command: string, ownTmuxSessionName: string): boolean {
-  return /^tmux\b/.test(command) && command.includes(ownTmuxSessionName);
+export function isOwnTmuxCommand(command: string, ownTmuxSessionName: string): boolean {
+  try {
+    const [executable, ...args] = commandArgs(command);
+    return Boolean(executable && path.basename(executable) === "tmux" && args.includes(ownTmuxSessionName));
+  } catch {
+    return false;
+  }
 }
 
 export function findExternalResumeProcesses(engine: Engine, resumeId: string, ownTmuxSessionName: string): number[] {
