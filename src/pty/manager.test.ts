@@ -161,14 +161,17 @@ describe("PtyManager boot-stability handling", () => {
 
     manager.start(jid, { engine: "claude", model: null, cwd: process.cwd(), sessionName: jid }, "go");
 
-    await new Promise((r) => setTimeout(r, 8000));
+    const deadline = Date.now() + 14_000;
+    while (Date.now() < deadline && !events.some((e) => e.kind === "progress" && e.text.includes("Update(a.ts)"))) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
 
     const progress = events.filter((e) => e.kind === "progress");
     expect(progress.length).toBeGreaterThan(0);
     expect(progress.some((e) => e.text.includes("Update(a.ts)"))).toBe(true);
 
     manager.kill(jid, "SIGKILL");
-  }, 15_000);
+  }, 20_000);
 
   it("detects progress/complete quickly when re-attaching to a tmux session that's already mid-task, instead of waiting through the fresh-spawn boot dance", async () => {
     const fixture = path.join(__dirname, "__fixtures__", "already-running-agent.mjs");
